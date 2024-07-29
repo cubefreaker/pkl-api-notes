@@ -1,4 +1,6 @@
 const express = require("express");
+const moment = require("moment-timezone");
+
 require("dotenv").config();
 
 const knex = require("knex")({
@@ -42,6 +44,10 @@ function checkAuthorization(req, res, next) {
   } catch (err) {
     return responseHandler(res, 401, false, "Invalid token", null);
   }
+}
+
+function getTimestamp() {
+  return moment().tz("Asia/Jakarta").format("YYYY-MM-DD HH:mm:ss");
 }
 
 app.use(express.json());
@@ -96,6 +102,7 @@ app.post("/signup", async (req, res, next) => {
       email,
       username: email,
       password,
+      created_at: getTimestamp(),
     });
     newUser = await knex("users").where("id", newUserId[0]).first();
   } catch (err) {
@@ -153,6 +160,7 @@ app.post("/notes", checkAuthorization, async (req, res, next) => {
       title,
       content,
       user_id: req.decodedToken.userId,
+      created_at: getTimestamp(),
     });
 
     newNote = await knex("notes").where("id", newNoteId[0]).first();
@@ -176,6 +184,7 @@ app.patch("/notes/:noteId", checkAuthorization, async (req, res, next) => {
     await knex("notes").where("id", noteId).update({
       title,
       content,
+      updated_at: getTimestamp(),
     });
 
     updatedNote = await knex("notes").where("id", noteId).first();
