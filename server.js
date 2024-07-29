@@ -24,6 +24,26 @@ function responseHandler(res, httpCode, success, message, data) {
   });
 }
 
+function checkAuthorization(req, res, next) {
+  try {
+    const token = req.headers?.authorization?.split(" ")[1] || null;
+    if (!token) {
+      return responseHandler(
+        res,
+        200,
+        false,
+        "Error!Token was not provided.",
+        null
+      );
+    }
+    const decodedToken = jwt.verify(token, process.env.SECRET_KEY);
+    req.decodedToken = decodedToken;
+    next();
+  } catch (err) {
+    return responseHandler(res, 401, false, "Invalid token", null);
+  }
+}
+
 app.use(express.json());
 
 app.post("/login", async (req, res, next) => {
@@ -107,24 +127,12 @@ app.post("/signup", async (req, res, next) => {
   }
 });
 
-app.get("/notes", async (req, res) => {
+app.get("/notes", checkAuthorization, async (req, res) => {
   try {
-    const token = req.headers?.authorization?.split(" ")[1] || null;
-
-    if (!token) {
-      return responseHandler(
-        res,
-        200,
-        false,
-        "Error!Token was not provided.",
-        null
-      );
-    }
-
-    // Decoding the token
-    const decodedToken = jwt.verify(token, process.env.SECRET_KEY);
-
-    let userNotes = await knex("notes").where("user_id", decodedToken.userId);
+    let userNotes = await knex("notes").where(
+      "user_id",
+      req.decodedToken.userId
+    );
     return responseHandler(
       res,
       200,
@@ -137,28 +145,14 @@ app.get("/notes", async (req, res) => {
   }
 });
 
-app.post("/notes", async (req, res, next) => {
+app.post("/notes", checkAuthorization, async (req, res, next) => {
   let newNote;
   try {
     const { title, content } = req.body;
-    const token = req.headers?.authorization?.split(" ")[1] || null;
-
-    if (!token) {
-      return responseHandler(
-        res,
-        200,
-        false,
-        "Error!Token was not provided.",
-        null
-      );
-    }
-
-    // Decoding the token
-    const decodedToken = jwt.verify(token, process.env.SECRET_KEY);
     let newNoteId = await knex("notes").insert({
       title,
       content,
-      user_id: decodedToken.userId,
+      user_id: req.decodedToken.userId,
     });
 
     newNote = await knex("notes").where("id", newNoteId[0]).first();
@@ -174,25 +168,11 @@ app.post("/notes", async (req, res, next) => {
   }
 });
 
-app.patch("/notes/:noteId", async (req, res, next) => {
+app.patch("/notes/:noteId", checkAuthorization, async (req, res, next) => {
   let updatedNote;
   try {
     const { title, content } = req.body;
     const noteId = req.params.noteId;
-    const token = req.headers?.authorization?.split(" ")[1] || null;
-
-    if (!token) {
-      return responseHandler(
-        res,
-        200,
-        false,
-        "Error!Token was not provided.",
-        null
-      );
-    }
-
-    // Decoding the token
-    const decodedToken = jwt.verify(token, process.env.SECRET_KEY);
     await knex("notes").where("id", noteId).update({
       title,
       content,
@@ -211,24 +191,10 @@ app.patch("/notes/:noteId", async (req, res, next) => {
   }
 });
 
-app.delete("/notes/:noteId", async (req, res, next) => {
+app.delete("/notes/:noteId", checkAuthorization, async (req, res, next) => {
   let deletedNote;
   try {
     const noteId = req.params.noteId;
-    const token = req.headers?.authorization?.split(" ")[1] || null;
-    //Authorization
-    if (!token) {
-      return responseHandler(
-        res,
-        200,
-        false,
-        "Error!Token was not provided.",
-        null
-      );
-    }
-
-    // Decoding the token
-    const decodedToken = jwt.verify(token, process.env.SECRET_KEY);
     deletedNote = await knex("notes").where("id", noteId).first();
     await knex("notes").where("id", noteId).del();
     return responseHandler(
